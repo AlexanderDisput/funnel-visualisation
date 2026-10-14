@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Recruiting Funnel — How Your Levers Drive Hires</title>
+  <title>Recruiting Funnel</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -11,64 +11,60 @@
 </head>
 <body>
   <div class="app">
-    <header class="app-header">
+    <canvas id="scene" class="scene"></canvas>
+
+    <header class="topbar">
       <div class="brand">
         <span class="brand-mark">indeed</span>
-        <span class="brand-divider"></span>
+        <span class="brand-sep"></span>
         <span class="brand-title">Recruiting Funnel</span>
       </div>
-      <p class="brand-sub">Watch how each lever changes who discovers your jobs, who applies, and who you hire.</p>
+      <div class="legend">
+        <span class="legend-item"><i class="dot dot-q"></i>High-quality</span>
+        <span class="legend-item"><i class="dot dot-s"></i>Candidate</span>
+      </div>
     </header>
 
-    <main class="stage-wrap">
-      <canvas id="scene" class="scene"></canvas>
-
-      <!-- Floating labels anchored over the canvas regions -->
-      <div class="scene-legend">
-        <span class="legend-item"><span class="dot dot-quality"></span>High-quality candidate</span>
-        <span class="legend-item"><span class="dot dot-standard"></span>Candidate</span>
-      </div>
-    </main>
-
-    <div class="presets">
-      <span class="presets-label">Demo presets</span>
-      <button class="chip" type="button" data-preset="weak">Tight budget · weak brand</button>
-      <button class="chip" type="button" data-preset="balanced">Balanced</button>
-      <button class="chip" type="button" data-preset="strong">Full Indeed stack</button>
-    </div>
-
-    <section class="controls" aria-label="Recruiting levers">
-      <div class="control-card">
-        <div class="control-head">
-          <label for="funnel">Budget &amp; Visibility</label>
-          <span class="control-value" id="funnelVal">—</span>
-        </div>
-        <input type="range" id="funnel" min="0" max="100" value="55" />
-        <p class="control-caption">Wider reach means more candidates discover your jobs.</p>
+    <section class="dock">
+      <div class="presets" role="group" aria-label="Scenarios">
+        <button class="chip" type="button" data-preset="weak">Tight budget · weak brand</button>
+        <button class="chip" type="button" data-preset="balanced">Balanced</button>
+        <button class="chip" type="button" data-preset="strong">Full Indeed stack</button>
       </div>
 
-      <div class="control-card">
-        <div class="control-head">
-          <label for="branding">Employer Branding</label>
-          <span class="control-value" id="brandingVal">—</span>
-        </div>
-        <input type="range" id="branding" min="0" max="100" value="60" />
-        <p class="control-caption">Strong reviews, benefits &amp; brand turn interest into applications.</p>
+      <div class="levers">
+        <label class="lever">
+          <span class="lever-name">
+            <svg viewBox="0 0 24 24" class="ico" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="2.6"/></svg>
+            Budget &amp; Visibility
+          </span>
+          <input type="range" id="funnel" min="0" max="100" value="55" />
+        </label>
+
+        <label class="lever">
+          <span class="lever-name">
+            <svg viewBox="0 0 24 24" class="ico" aria-hidden="true"><path d="M12 3.5l2.6 5.3 5.9.8-4.3 4.1 1 5.8L12 16.8 6.8 19.5l1-5.8L3.5 9.6l5.9-.8L12 3.5Z"/></svg>
+            Employer Branding
+          </span>
+          <input type="range" id="branding" min="0" max="100" value="60" />
+        </label>
+
+        <label class="lever">
+          <span class="lever-name">
+            <svg viewBox="0 0 24 24" class="ico" aria-hidden="true"><circle cx="8" cy="8.5" r="2.7"/><circle cx="16" cy="8.5" r="2.7"/><path d="M3.5 18c0-2.5 2-4.3 4.5-4.3S12.5 15.5 12.5 18M11.5 18c0-2.5 2-4.3 4.5-4.3s4.5 1.8 4.5 4.3"/></svg>
+            Candidate Volume
+          </span>
+          <input type="range" id="volume" min="0" max="100" value="55" />
+        </label>
       </div>
 
-      <div class="control-card">
-        <div class="control-head">
-          <label for="volume">Candidate Volume</label>
-          <span class="control-value" id="volumeVal">—</span>
-        </div>
-        <input type="range" id="volume" min="0" max="100" value="55" />
-        <p class="control-caption">Size of the talent pool reaching the market.</p>
-      </div>
-
-      <div class="control-actions">
-        <button id="compare" class="btn btn-ghost" type="button">Compare</button>
-        <button id="pause" class="btn btn-primary" type="button">Pause</button>
-        <button id="reset" class="btn btn-ghost" type="button">Reset</button>
+      <div class="actions">
+        <button id="pause" class="btn btn-primary" type="button" aria-label="Pause">
+          <svg viewBox="0 0 24 24" class="ico" aria-hidden="true"><rect x="7" y="6" width="3.2" height="12" rx="1"/><rect x="14" y="6" width="3.2" height="12" rx="1"/></svg>
+        </button>
+        <button id="reset" class="btn btn-ghost" type="button" aria-label="Reset">
+          <svg viewBox="0 0 24 24" class="ico" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.4-5.7M20 4.5V9h-4.5"/></svg>
+        </button>
       </div>
     </section>
   </div>
