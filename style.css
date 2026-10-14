@@ -112,21 +112,42 @@ body {
 .levers {
   grid-area: levers;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 18px 26px;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px 40px;
 }
 .actions { grid-area: actions; display: flex; align-items: center; gap: 10px; }
 
 /* Levers */
-.lever { display: flex; flex-direction: column; gap: 11px; min-width: 150px; }
+.lever { display: flex; flex-direction: column; gap: 11px; min-width: 220px; }
 .lever-name {
   display: inline-flex;
   align-items: center;
   gap: 9px;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 700;
   color: var(--ink);
   letter-spacing: 0.1px;
+}
+
+/* Factor notes */
+.factors { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.factor-lead {
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  margin-right: 1px;
+}
+.tag {
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+  color: var(--ink-soft);
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid var(--glass-brd);
+  border-radius: 6px;
+  padding: 3px 8px;
 }
 .ico { width: 16px; height: 16px; fill: none; stroke: var(--blue); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 
@@ -211,7 +232,7 @@ input[type="range"]::-moz-range-thumb {
     grid-template-columns: 1fr;
     grid-template-areas: "presets" "levers" "actions";
   }
-  .levers { grid-template-columns: 1fr 1fr; }
+  .levers { grid-template-columns: 1fr; }
   .actions { justify-content: flex-end; }
   .legend { display: none; }
 }

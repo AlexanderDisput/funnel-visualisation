@@ -3,10 +3,13 @@
    Pure canvas, no dependencies.
 
      Budget & Visibility -> funnel MOUTH width (reach)
-     Employer Branding   -> HOLE size in funnel slopes (leaks)
+     Employer Branding   -> HOLE size in the V-shaped walls (leaks)
      Candidate Volume    -> spawn rate
-   High-quality (red) candidates leak first when branding is weak.
-   Candidates pack in the bins with light collision physics.
+
+   Candidates collide with the funnel walls (simple physics) and
+   slide down into the outlet. Where the walls have a gap, some
+   candidates leak out into DROPPED OFF (red/high-quality first).
+   Bins pack with ball-to-ball collision.
    ============================================================ */
 
 (() => {
@@ -20,17 +23,19 @@
   const sliders = {
     funnel: document.getElementById("funnel"),
     branding: document.getElementById("branding"),
-    volume: document.getElementById("volume"),
   };
   const btnPause = document.getElementById("pause");
   const btnReset = document.getElementById("reset");
   const presetBtns = Array.from(document.querySelectorAll(".chip"));
 
   const PRESETS = {
-    weak: { funnel: 24, branding: 18, volume: 52 },
-    balanced: { funnel: 55, branding: 60, volume: 55 },
-    strong: { funnel: 86, branding: 90, volume: 80 },
+    weak: { funnel: 24, branding: 18 },
+    balanced: { funnel: 55, branding: 60 },
+    strong: { funnel: 86, branding: 90 },
   };
+
+  // constant candidate trickle (50% of the former default volume rate)
+  const SPAWN_RATE = 0.13;
 
   let W = 0, H = 0, dpr = 1;
   let paused = false;
@@ -38,10 +43,10 @@
 
   const geo = {
     centerX: 0,
-    funnelTopY: 0, collarY: 0, outletY: 0, stemBottomY: 0,
-    collarHalf: 0, outletHalf: 0,
+    funnelTopY: 0, outletY: 0, stemBottomY: 0,
+    outletHalf: 0,
     mouthHalf: 0, mouthHalfTarget: 0,
-    holeY: 0, holeTHalf: 0, holeTHalfTarget: 0,
+    holeHalfT: 0.1, holeHalfTTarget: 0.1, // half-extent of the hole along the slope (param 0..0.5)
     pLeakStd: 0.4, pLeakQual: 0.6,
   };
 
@@ -101,30 +106,27 @@
   function computeGeometry(snap) {
     geo.centerX = W / 2;
     const topPad = 88;
-    const bottomPad = W < 760 ? 260 : 196;
+    const bottomPad = W < 760 ? 300 : 220;
     const binBottom = H - bottomPad;
     const U = binBottom - topPad;
 
     geo.funnelTopY = topPad + U * 0.00;
-    geo.collarY = topPad + U * 0.40;
-    geo.outletY = topPad + U * 0.60;
-    geo.stemBottomY = topPad + U * 0.68;
-    geo.collarHalf = Math.max(38, W * 0.07);
-    geo.outletHalf = Math.max(15, W * 0.028);
-    geo.holeY = geo.collarY + (geo.outletY - geo.collarY) * 0.5;
+    geo.outletY = topPad + U * 0.52;
+    geo.stemBottomY = topPad + U * 0.60;
+    geo.outletHalf = Math.max(14, W * 0.026);
 
     const f = sliders.funnel.value / 100;
     const b = sliders.branding.value / 100;
     const openness = 1 - b;
 
     geo.mouthHalfTarget = W * (0.12 + 0.33 * f);
-    geo.holeTHalfTarget = 0.06 + 0.34 * openness;
-    geo.pLeakStd = clamp01(0.75 - 0.68 * b);
+    geo.holeHalfTTarget = 0.05 + 0.30 * openness;   // along the slope
+    geo.pLeakStd = clamp01(0.70 - 0.64 * b);
     geo.pLeakQual = clamp01(0.92 - 0.9 * b * b);
 
     if (snap || geo.mouthHalf === 0) {
       geo.mouthHalf = geo.mouthHalfTarget;
-      geo.holeTHalf = geo.holeTHalfTarget;
+      geo.holeHalfT = geo.holeHalfTTarget;
     }
 
     if (snap || binList.length === 0) buildBins(binBottom, topPad, U);
@@ -132,34 +134,26 @@
 
   function buildBins(binBottom, topPad, U) {
     const C = geo.centerX;
-    const mainHalf = Math.min(W * 0.14, 175);
+    const mainHalf = Math.min(W * 0.115, 145);   // smaller Applications container
     const lostHalf = Math.min(W * 0.085, 105);
     const nrHalf = Math.min(W * 0.07, 90);
-    const gap = Math.max(W * 0.012, 10);
+    const gap = Math.max(W * 0.014, 12);
     const lostOffset = mainHalf + gap + lostHalf;
     const nrOffset = mainHalf + gap + 2 * lostHalf + gap + nrHalf;
     const mainTop = topPad + U * 0.72;
-    const sideTop = topPad + U * 0.82;
+    const sideTop = topPad + U * 0.80;
     const inset = 7;
 
-    bins.main = makeBin({ cx: C, half: mainHalf, left: C - mainHalf + inset, right: C + mainHalf - inset, top: mainTop, bottom: binBottom, max: 150, accent: "blue", label: "APPLICATIONS" });
-    bins.lostL = makeBin({ cx: C - lostOffset, half: lostHalf, left: C - lostOffset - lostHalf + inset, right: C - lostOffset + lostHalf - inset, top: sideTop, bottom: binBottom, max: 70, accent: "mute", label: "DROPPED OFF" });
-    bins.lostR = makeBin({ cx: C + lostOffset, half: lostHalf, left: C + lostOffset - lostHalf + inset, right: C + lostOffset + lostHalf - inset, top: sideTop, bottom: binBottom, max: 70, accent: "mute", label: "DROPPED OFF" });
-    bins.nrL = makeBin({ cx: C - nrOffset, half: nrHalf, left: C - nrOffset - nrHalf + inset, right: C - nrOffset + nrHalf - inset, top: sideTop, bottom: binBottom, max: 60, accent: "faint", label: "NOT REACHED" });
-    bins.nrR = makeBin({ cx: C + nrOffset, half: nrHalf, left: C + nrOffset - nrHalf + inset, right: C + nrOffset + nrHalf - inset, top: sideTop, bottom: binBottom, max: 60, accent: "faint", label: "NOT REACHED" });
+    bins.main = makeBin({ cx: C, half: mainHalf, left: C - mainHalf + inset, right: C + mainHalf - inset, top: mainTop, bottom: binBottom, max: 120, accent: "blue", label: "APPLICATIONS" });
+    bins.lostL = makeBin({ cx: C - lostOffset, half: lostHalf, left: C - lostOffset - lostHalf + inset, right: C - lostOffset + lostHalf - inset, top: sideTop, bottom: binBottom, max: 80, accent: "mute", label: "DROPPED OFF" });
+    bins.lostR = makeBin({ cx: C + lostOffset, half: lostHalf, left: C + lostOffset - lostHalf + inset, right: C + lostOffset + lostHalf - inset, top: sideTop, bottom: binBottom, max: 80, accent: "mute", label: "DROPPED OFF" });
+    bins.nrL = makeBin({ cx: C - nrOffset, half: nrHalf, left: C - nrOffset - nrHalf + inset, right: C - nrOffset + nrHalf - inset, top: sideTop, bottom: binBottom, max: 65, accent: "faint", label: "NOT REACHED" });
+    bins.nrR = makeBin({ cx: C + nrOffset, half: nrHalf, left: C + nrOffset - nrHalf + inset, right: C + nrOffset + nrHalf - inset, top: sideTop, bottom: binBottom, max: 65, accent: "faint", label: "NOT REACHED" });
     binList = [bins.nrL, bins.lostL, bins.main, bins.lostR, bins.nrR];
   }
 
-  function funnelHalfAt(y) {
-    if (y <= geo.collarY) return lerp(geo.mouthHalf, geo.collarHalf, clamp01((y - geo.funnelTopY) / (geo.collarY - geo.funnelTopY)));
-    return lerp(geo.collarHalf, geo.outletHalf, clamp01((y - geo.collarY) / (geo.outletY - geo.collarY)));
-  }
   function lerp(a, b, t) { return a + (b - a) * t; }
   function clamp01(t) { return Math.max(0, Math.min(1, t)); }
-  function holeYTop() {
-    const span = geo.outletY - geo.collarY;
-    return geo.collarY + span * (0.5 - geo.holeTHalf);
-  }
 
   // ---------------- Particles ----------------
   function spawnParticle() {
@@ -170,8 +164,8 @@
       vx: (Math.random() - 0.5) * 0.3,
       vy: 1.6 + Math.random() * 1.0,
       quality: Math.random() < 0.17,
-      state: "falling", classified: false, leakRolled: false,
-      bin: null, entryX: 0, gateX: 0, gateY: 0, side: 0,
+      state: "falling", classified: false, leakRolled: false, leaked: false,
+      bin: null, entryX: 0, side: 0,
     });
   }
 
@@ -191,47 +185,72 @@
     }
   }
 
+  // circle vs. wall segment; slides the ball, rolls the leak dice inside the hole
+  function resolveWall(p, ax, ay, bx, by, holeWall) {
+    if (p.leaked) return;
+    const ex = bx - ax, ey = by - ay;
+    const len2 = ex * ex + ey * ey || 1;
+    const t = ((p.x - ax) * ex + (p.y - ay) * ey) / len2;
+    if (t < 0 || t > 1) return;
+
+    // inward normal, oriented toward the funnel center
+    let nx = ey, ny = -ex;
+    const nl = Math.hypot(nx, ny) || 1; nx /= nl; ny /= nl;
+    const mx = ax + ex * t;
+    if (nx * (geo.centerX - mx) < 0) { nx = -nx; ny = -ny; }
+
+    const sd = (p.x - ax) * nx + (p.y - ay) * ny; // signed distance from wall, inside = +
+    if (sd >= PARTICLE_R || sd < -PARTICLE_R * 5) return;
+
+    if (holeWall && t > 0.5 - geo.holeHalfT && t < 0.5 + geo.holeHalfT) {
+      if (!p.leakRolled) {
+        p.leakRolled = true;
+        const pl = p.quality ? geo.pLeakQual : geo.pLeakStd;
+        if (Math.random() < pl) p.leaked = true;
+      }
+      if (p.leaked) return; // slip through the gap
+    }
+
+    const pen = PARTICLE_R - sd;
+    p.x += nx * pen; p.y += ny * pen;
+    const vn = p.vx * nx + p.vy * ny;
+    if (vn < 0) { p.vx -= vn * nx; p.vy -= vn * ny; } // kill into-wall velocity -> slide
+    p.vx *= 0.985; // slope friction
+  }
+
   function updateParticle(p, dt) {
     const g = 0.12 * dt;
+    const cx = geo.centerX, mh = geo.mouthHalf, oh = geo.outletHalf;
+    const top = geo.funnelTopY, outletY = geo.outletY, stemBottomY = geo.stemBottomY;
+
     switch (p.state) {
       case "falling": {
         p.vy += g; p.y += p.vy * dt; p.x += p.vx * dt;
-        if (!p.classified && p.y >= geo.funnelTopY) classify(p);
+        if (!p.classified && p.y >= top) classify(p);
         break;
       }
-      case "infunnel": {
-        p.vy += g * 0.7; p.vy = Math.min(p.vy, 6); p.y += p.vy * dt;
-        const half = funnelHalfAt(p.y);
-        const left = geo.centerX - half, right = geo.centerX + half;
-        p.vx += (geo.centerX - p.x) * 0.01 * dt; p.vx *= 0.96; p.x += p.vx * dt;
-        if (p.x < left + PARTICLE_R) { p.x = left + PARTICLE_R; p.vx += 0.35; }
-        if (p.x > right - PARTICLE_R) { p.x = right - PARTICLE_R; p.vx -= 0.35; }
 
-        if (!p.leakRolled && p.y >= holeYTop() && p.y > geo.collarY) {
-          p.leakRolled = true;
-          const pLeak = p.quality ? geo.pLeakQual : geo.pLeakStd;
-          if (Math.random() < pLeak) {
-            p.side = p.x <= geo.centerX ? -1 : 1;
-            p.gateY = geo.holeY;
-            p.gateX = geo.centerX + p.side * funnelHalfAt(geo.holeY);
-            p.state = "leaking";
-            break;
-          }
-        }
-        if (p.y >= geo.outletY) { assignBin(p, bins.main); p.state = "tosettle"; }
-        break;
-      }
-      case "leaking": {
-        p.x += (p.gateX - p.x) * 0.2 * dt;
-        p.y += (p.gateY - p.y) * 0.2 * dt;
-        if (Math.abs(p.x - p.gateX) < 4 && Math.abs(p.y - p.gateY) < 6) {
+      case "infunnel": {
+        p.vy += 0.14 * dt; p.vy = Math.min(p.vy, 5.5);
+        p.x += p.vx * dt; p.y += p.vy * dt;
+
+        resolveWall(p, cx - mh, top, cx - oh, outletY, true);
+        resolveWall(p, cx + mh, top, cx + oh, outletY, true);
+        resolveWall(p, cx - oh, outletY, cx - oh, stemBottomY, false);
+        resolveWall(p, cx + oh, outletY, cx + oh, stemBottomY, false);
+
+        if (p.leaked) {
+          p.side = p.x <= cx ? -1 : 1;
           assignBin(p, p.side < 0 ? bins.lostL : bins.lostR);
           p.state = "tosettle";
-          p.vx = p.side * (3.0 + Math.random());
-          p.vy = 0.3;
+          p.vx = p.side * (2.2 + Math.random() * 1.3);
+          p.vy = 0.4;
+          break;
         }
+        if (p.y >= stemBottomY) { assignBin(p, bins.main); p.state = "tosettle"; }
         break;
       }
+
       case "tosettle": {
         const bin = p.bin;
         const clearing = Math.abs(p.x - bin.cx) > bin.half;
@@ -293,11 +312,9 @@
   // ---------------- Update ----------------
   function update(dt) {
     geo.mouthHalf += (geo.mouthHalfTarget - geo.mouthHalf) * 0.12;
-    geo.holeTHalf += (geo.holeTHalfTarget - geo.holeTHalf) * 0.12;
+    geo.holeHalfT += (geo.holeHalfTTarget - geo.holeHalfT) * 0.12;
 
-    const v = sliders.volume.value / 100;
-    const rate = (0.1 + v * 1.0) * 0.4;
-    spawnAcc += rate * dt;
+    spawnAcc += SPAWN_RATE * dt;
     while (spawnAcc >= 1) { spawnParticle(); spawnAcc -= 1; }
 
     for (let i = particles.length - 1; i >= 0; i--) {
@@ -307,25 +324,21 @@
   }
 
   // ---------------- Rendering ----------------
-  function pointOnLowerSlope(side, t) {
-    return [lerp(geo.centerX + side * geo.collarHalf, geo.centerX + side * geo.outletHalf, t),
-            lerp(geo.collarY, geo.outletY, t)];
-  }
-
   function drawFunnel() {
-    const cx = geo.centerX, mh = geo.mouthHalf, ch = geo.collarHalf, oh = geo.outletHalf;
+    const cx = geo.centerX, mh = geo.mouthHalf, oh = geo.outletHalf;
+    const top = geo.funnelTopY, outletY = geo.outletY, stemBottomY = geo.stemBottomY;
+    const hh = geo.holeHalfT;
 
+    // interior fill
     ctx.beginPath();
-    ctx.moveTo(cx - mh, geo.funnelTopY);
-    ctx.lineTo(cx - ch, geo.collarY);
-    ctx.lineTo(cx - oh, geo.outletY);
-    ctx.lineTo(cx - oh, geo.stemBottomY);
-    ctx.lineTo(cx + oh, geo.stemBottomY);
-    ctx.lineTo(cx + oh, geo.outletY);
-    ctx.lineTo(cx + ch, geo.collarY);
-    ctx.lineTo(cx + mh, geo.funnelTopY);
+    ctx.moveTo(cx - mh, top);
+    ctx.lineTo(cx - oh, outletY);
+    ctx.lineTo(cx - oh, stemBottomY);
+    ctx.lineTo(cx + oh, stemBottomY);
+    ctx.lineTo(cx + oh, outletY);
+    ctx.lineTo(cx + mh, top);
     ctx.closePath();
-    const fg = ctx.createLinearGradient(0, geo.funnelTopY, 0, geo.stemBottomY);
+    const fg = ctx.createLinearGradient(0, top, 0, stemBottomY);
     fg.addColorStop(0, "rgba(91,157,255,0.10)");
     fg.addColorStop(1, "rgba(91,157,255,0.03)");
     ctx.fillStyle = fg;
@@ -339,35 +352,25 @@
     ctx.shadowColor = "rgba(91,157,255,0.75)";
     ctx.shadowBlur = 14;
 
-    const hh = geo.holeTHalf;
     for (const side of [-1, 1]) {
-      ctx.beginPath();
-      ctx.moveTo(cx + side * mh, geo.funnelTopY);
-      ctx.lineTo(cx + side * ch, geo.collarY);
-      ctx.stroke();
+      const ax = cx + side * mh, ay = top, bx = cx + side * oh, by = outletY;
+      const hsx = lerp(ax, bx, 0.5 - hh), hsy = lerp(ay, by, 0.5 - hh);
+      const hex = lerp(ax, bx, 0.5 + hh), hey = lerp(ay, by, 0.5 + hh);
 
-      const [sx, sy] = pointOnLowerSlope(side, Math.max(0, 0.5 - hh));
-      const [ex, ey] = pointOnLowerSlope(side, Math.min(1, 0.5 + hh));
-      ctx.beginPath();
-      ctx.moveTo(cx + side * ch, geo.collarY);
-      ctx.lineTo(sx, sy);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(ex, ey);
-      ctx.lineTo(cx + side * oh, geo.outletY);
-      ctx.lineTo(cx + side * oh, geo.stemBottomY);
-      ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(hsx, hsy); ctx.stroke();   // upper wall
+      ctx.beginPath(); ctx.moveTo(hex, hey); ctx.lineTo(bx, by);                 // lower wall
+      ctx.lineTo(cx + side * oh, stemBottomY); ctx.stroke();                     // stem
 
-      // glowing hole-edge accents
       ctx.shadowBlur = 10;
       ctx.fillStyle = "#bcd4ff";
-      ctx.beginPath(); ctx.arc(sx, sy, 2.6, 0, TAU); ctx.fill();
-      ctx.beginPath(); ctx.arc(ex, ey, 2.6, 0, TAU); ctx.fill();
+      ctx.beginPath(); ctx.arc(hsx, hsy, 2.8, 0, TAU); ctx.fill();
+      ctx.beginPath(); ctx.arc(hex, hey, 2.8, 0, TAU); ctx.fill();
+      ctx.shadowBlur = 14;
     }
 
     ctx.fillStyle = "#9cc2ff";
-    ctx.beginPath(); ctx.arc(cx - mh, geo.funnelTopY, 3.5, 0, TAU); ctx.fill();
-    ctx.beginPath(); ctx.arc(cx + mh, geo.funnelTopY, 3.5, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx - mh, top, 3.5, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx + mh, top, 3.5, 0, TAU); ctx.fill();
     ctx.restore();
   }
 
@@ -455,7 +458,6 @@
       if (!p) return;
       sliders.funnel.value = p.funnel;
       sliders.branding.value = p.branding;
-      sliders.volume.value = p.volume;
       Object.values(sliders).forEach(onSlider);
       clearActivePreset();
       btn.classList.add("is-active");
